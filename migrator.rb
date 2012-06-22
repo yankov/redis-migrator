@@ -71,9 +71,12 @@ class Migrator
         new_cluster.sadd(key, member)
       end
 
+      true
+
       #remove key from the old node
       old_cluster.del(key)
     end
+    
   end
 
   def migrate_cluster
