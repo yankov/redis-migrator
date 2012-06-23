@@ -101,21 +101,3 @@ class Redis
 
   end # class Migrator
 end # class Redis
-
-#ec2-107-22-34-61.compute-1.amazonaws.com
-#ec2-50-16-24-68.compute-1.amazonaws.com
-#ec2-184-72-169-62.compute-1.amazonaws.com
-
-# migrator = Redis::Migrator.new(["localhost:6379/1", "localhost:6378/1"],
-#                         ["localhost:6379/1", "localhost:6378/1", "localhost:6377/1"])
-
-# migrator.populate_cluster(100, 100)
-
-# keys = ('a'..'z').to_a
-# populate_keys(keys, r1)
-
-# r1.add_node("redis://localhost:6377")
-
-# p changed_keys(keys, r1, r2)
-
-# migrate_cluster(keys, r2, r1)
