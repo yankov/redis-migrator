@@ -1,10 +1,7 @@
-# java_import java.util.concurrent.Executors
-
 require 'rubygems'
 require 'redis'
 require 'redis/distributed'
 require 'md5'
-# require 'ruby-debug'
 
 class Redis
   class Migrator

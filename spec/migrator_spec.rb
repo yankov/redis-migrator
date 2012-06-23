@@ -1,7 +1,3 @@
-$LOAD_PATH.unshift "/Users/yankov/projects/mock_redis/lib"
-
-require "/Users/yankov/projects/mock_redis/lib/mock_redis.rb"
-
 describe Redis::Migrator do
   
   before do
@@ -11,6 +7,7 @@ describe Redis::Migrator do
   
     @migrator = Redis::Migrator.new(["localhost:6379", "localhost:6378"],
                  ["localhost:6379", "localhost:6378", "localhost:6377"])
+
     @migrator.populate_keys(('a'..'z').to_a)
   end
 
@@ -28,7 +25,6 @@ describe Redis::Migrator do
   end
 
   it "should migrate all keys for which nodes have changed" do
-
     @migrator.migrate_cluster
 
     (@migrator.old_cluster.keys("*") & @migrator.changed_keys).should == []
