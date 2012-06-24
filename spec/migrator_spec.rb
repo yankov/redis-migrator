@@ -6,7 +6,7 @@ describe Redis::Migrator do
     }
   
     @migrator = Redis::Migrator.new(["localhost:6379", "localhost:6378"],
-                 ["localhost:6379", "localhost:6378", "localhost:6377"])
+                                    ["localhost:6379", "localhost:6378", "localhost:6377"])
 
     @migrator.populate_keys(('a'..'z').to_a)
   end

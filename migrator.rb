@@ -69,25 +69,22 @@ class Redis
           new_cluster.sadd(key, member)
         end
 
-        true
-
         #remove key from the old node
-        old_cluster.del(key)
+        old_cluster.node_for(key).del(key)
       end
       
     end
 
-    def migrate_cluster
+    def migrate_cluster(options={})
+      options[:threads_num] ||= 1
+
       migrating_keys = self.changed_keys
 
-      migrating_keys.each_slice(1) do |keys_slice| 
+      migrating_keys.each_slice(options[:threads_num]) do |keys_slice| 
 
         thread_pool = []
 
         thread_pool << Thread.new do
-          #create separate connections to redis 
-          # Thread.current[:old_cluster] = old_cluster.clone
-          # Thread.current[:new_cluster] = new_cluster.clone
           migrate_keys(keys_slice)
         end
         
