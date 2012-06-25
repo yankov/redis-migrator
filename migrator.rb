@@ -16,6 +16,38 @@ class Redis
       @new_cluster = Redis::Distributed.new(@new_hosts)
     end
 
+    class << self
+      def copy_string(r1, r2, key)
+        value = r1.get(key)
+        r2.set(key, value)
+      end
+    
+      def copy_hash(r1, r2, key)
+        r1.hgetall(key).each do |field, value|
+          r2.hset(key, field, value)
+        end
+      end
+    
+      def copy_list(r1, r2, key)
+        r1.lrange(key, 0, -1).each do |value|
+          r2.lpush(key, value)
+        end
+      end
+    
+      def copy_set(r1, r2, key)
+        r1.smembers(key).each do |member|
+          r2.sadd(key, member)
+        end
+      end
+    
+      def copy_zset(r1, r2, key)
+        r1.zrange(key, 0, -1, :with_scores => true).each_slice(2) do |member, score|
+          r2.zadd(key, score, member)
+        end 
+      end
+    end
+
+
     def populate_cluster(keys_num, followers_size)
       thread_pool = []
 
@@ -63,12 +95,7 @@ class Redis
       return false if keys.empty? || keys.nil?
 
       keys.each do |key|
-        #rewrite key members to the new node
-        old_cluster.smembers(key).each do |member|
-          new_cluster.sadd(key, member)
-        end
-
-        #remove key from the old node
+        copy_key(old_cluster, new_cluster, key)
         old_cluster.node_for(key).del(key)
       end
       
@@ -89,8 +116,15 @@ class Redis
         
         thread_pool.each {|th| th.join}
       end
+    end
 
+    def copy_key(old_cluster, new_cluster, key)
+      key_type = old_cluster.type(key)
+      return false unless ['list', 'hash', 'string', 'set', 'zset'].include?(key_type)
+
+      Migrator.send("copy_#{key_type}", old_cluster, new_cluster, key)
     end
 
   end # class Migrator
+
 end # class Redis
