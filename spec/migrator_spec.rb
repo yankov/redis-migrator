@@ -8,7 +8,10 @@ describe Redis::Migrator do
     @migrator = Redis::Migrator.new(["localhost:6379", "localhost:6378"],
                                     ["localhost:6379", "localhost:6378", "localhost:6377"])
 
-    @migrator.populate_keys(('a'..'z').to_a)
+    #populate old cluster with some keys
+    ('a'..'z').to_a.each do |key|
+      (1..100).to_a.each {|val| @migrator.old_cluster.sadd(key, val)}
+    end
   end
 
   it "should show keys which need migration" do

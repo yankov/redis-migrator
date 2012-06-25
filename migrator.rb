@@ -1,7 +1,5 @@
-require 'rubygems'
 require 'redis'
 require 'redis/distributed'
-require 'md5'
 
 class Redis
   class Migrator
@@ -47,38 +45,6 @@ class Redis
       end
     end
 
-
-    def populate_cluster(keys_num, followers_size)
-      thread_pool = []
-
-      keys_num.times do |i|
-        id = "player:" + ::Digest::MD5.hexdigest(i.to_s) + ":followers"
-
-        thread_pool << Thread.new(Redis::Distributed.new(@old_hosts), id, followers_size) do |redis, k, num|
-          begin 
-            num.times do |x|
-              follower_id = ::Digest::MD5.hexdigest("f" + x.to_s)
-              redis.sadd(k, follower_id)
-            end
-          rescue => e
-            p e.message
-          end
-        
-        end
-
-      end
-
-      thread_pool.each {|th| th.join}      
-    end
-
-    def populate_keys(keys)
-      keys.each do |key|
-        (1..100).to_a.each do |val|
-          old_cluster.sadd(key, val)
-        end
-      end
-    end
-
     def changed_keys
       keys = old_cluster.keys("*")
 
@@ -98,7 +64,6 @@ class Redis
         copy_key(old_cluster, new_cluster, key)
         old_cluster.node_for(key).del(key)
       end
-      
     end
 
     def migrate_cluster(options={})
@@ -126,5 +91,4 @@ class Redis
     end
 
   end # class Migrator
-
 end # class Redis

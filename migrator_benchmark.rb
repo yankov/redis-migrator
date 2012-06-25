@@ -4,6 +4,7 @@ require "ruby-debug"
 
 class MigratorBenchmark
 
+  # TODO:
   # populate cluster => measure time 
   # get changed keys => measure time
   # migrate cluster  => measure time
@@ -13,6 +14,14 @@ class MigratorBenchmark
   def initialize(old_hosts, new_hosts)
     @old_hosts = old_hosts.map{|h| "redis://" + h}
     @migrator = Redis::Migrator.new(old_hosts, new_hosts) 
+  end
+
+  def populate_keys(keys)
+    keys.each do |key|
+      (1..100).to_a.each do |val|
+        old_cluster.sadd(key, val)
+      end
+    end
   end
 
   def populate_cluster(keys_num, size)
