@@ -37,7 +37,6 @@ class Redis
       end
 
       thread_pool.each {|th| th.join}      
-
     end
 
     def populate_keys(keys)
