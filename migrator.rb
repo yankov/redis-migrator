@@ -43,7 +43,7 @@ class Redis
           r2.zadd(key, score, member)
         end 
       end
-    end
+    end # class << self
 
     def changed_keys
       keys = old_cluster.keys("*")
