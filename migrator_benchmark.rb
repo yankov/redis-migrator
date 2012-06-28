@@ -1,44 +1,41 @@
 require 'migrator.rb'
-require 'benchmark'
-require "ruby-debug"
 require 'celluloid'
+require 'digest'
 
 class MigratorBenchmark
   include Celluloid
 
-  def initialize(old_hosts, new_hosts)
-    @old_hosts = old_hosts.map{|h| "redis://" + h}
-    @new_hosts = old_hosts.map{|h| "redis://" + h}
-  end
-
   def populate_keys(redis, i, num)
-    begin 
-      key = ::Digest::MD5.hexdigest(i.to_s)
+    key = ::Digest::MD5.hexdigest(i.to_s)
 
-      num.times do |x|
-        redis.sadd(key, ::Digest::MD5.hexdigest("f" + x.to_s))
-      end
-    rescue => e
-      p e.message
+    num.times do |x|
+      redis.sadd(key, ::Digest::MD5.hexdigest("f" + x.to_s))
     end
+  rescue => e
+    p e.message
   end
 
-  def populate_cluster(keys_num, size)
-    pool = MigratorBenchmark.pool(size: 400, args: [@old_hosts, @new_hosts])
+end
+
+class Populator
+
+  def self.populate_cluster(redis_hosts, keys_num, size)
+    pool = MigratorBenchmark.pool(:size => 400)
 
     keys_num.times do |i|
-      pool.future(:populate_keys, Redis::Distributed.new(@old_hosts), i, size)
+      pool.future(:populate_keys, Redis::Distributed.new(redis_hosts), i, size)
     end
   end
 
 end
 
+redis_hosts = ["redis://redis-host1.com:6379/1", "redis://redis-host2.com:6379/1"]
 
-bc = MigratorBenchmark.new(["redis-host1.com:6379/1", "redis-host2.com:6379/1"],
-                           ["redis-host1.com:6379/1", "redis-host2.com:6379/1", "redis-host3.com:6379/1"])
+# just to flush redis
+Redis::Distributed.new(redis_hosts).flushdb
 
-r = Redis::Distributed.new(["redis://redis-host1.com:6379/1", "redis://redis-host2.com:6379/1"])
-r.flushdb
+Populator.populate_cluster(redis_hosts, 400, 100)
 
-bc.populate_cluster(400, 100) 
+
+
 
