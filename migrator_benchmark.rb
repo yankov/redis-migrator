@@ -9,7 +9,7 @@ require './lib/support/redis_distributed.rb'
 
 class MigratorBenchmark
 
-  attr_reader :redis 
+  attr_accessor :redis, :counter, :loop_size 
 
   def initialize(redis_hosts)
     @redis_hosts = redis_hosts 
@@ -19,7 +19,7 @@ class MigratorBenchmark
     key = ::Digest::MD5.hexdigest(i.to_s)
 
     num.times do |x|
-      @redis.sadd(key, ::Digest::MD5.hexdigest("f" + x.to_s))
+      @redis.sadd(key, ::Digest::MD5.hexdigest("f" + x.to_s)).callback { self.counter += 1 }
     end
   rescue => e
     p e.message
@@ -27,6 +27,9 @@ class MigratorBenchmark
 
 
   def populate_cluster(keys_num, size)
+    self.loop_size = keys_num * size
+    self.counter = 0
+
     EM.synchrony do
       @redis = Redis::Distributed.new(@redis_hosts)
       @redis.flushdb
@@ -34,6 +37,9 @@ class MigratorBenchmark
       EM::Synchrony::FiberIterator.new(keys_num.times.to_a, 1000).each do |i|
         self.populate_keys(i, size)
       end
+
+      EM::add_periodic_timer( 2 ) { EM.stop if counter == loop_size }
+
     end
   end
 
