@@ -1,40 +1,50 @@
-require 'migrator.rb'
-require 'celluloid'
+require './migrator.rb'
 require 'digest'
+require 'em-synchrony'
+require "em-synchrony/fiber_iterator"
+require 'em-hiredis'
+require 'redis/distributed'
+require './lib/support/hiredis.rb'
+require './lib/support/redis_distributed.rb'
 
 class MigratorBenchmark
-  include Celluloid
 
-  def populate_keys(redis, i, num)
+  attr_reader :redis 
+
+  def initialize(redis_hosts)
+    @redis_hosts = redis_hosts 
+  end
+
+  def populate_keys(i, num)
     key = ::Digest::MD5.hexdigest(i.to_s)
 
     num.times do |x|
-      redis.sadd(key, ::Digest::MD5.hexdigest("f" + x.to_s))
+      @redis.sadd(key, ::Digest::MD5.hexdigest("f" + x.to_s))
     end
   rescue => e
     p e.message
   end
 
-end
 
-class Populator
+  def populate_cluster(keys_num, size)
+    EM.synchrony do
+      @redis = Redis::Distributed.new(@redis_hosts)
+      @redis.flushdb
 
-  def self.populate_cluster(redis_hosts, keys_num, size)
-    pool = MigratorBenchmark.pool(:size => 400)
-
-    keys_num.times do |i|
-      pool.future(:populate_keys, Redis::Distributed.new(redis_hosts), i, size)
+      EM::Synchrony::FiberIterator.new(keys_num.times.to_a, 1000).each do |i|
+        self.populate_keys(i, size)
+      end
     end
   end
 
 end
 
-redis_hosts = ["redis://redis-host1.com:6379/1", "redis://redis-host2.com:6379/1"]
 
-# just to flush redis
-Redis::Distributed.new(redis_hosts).flushdb
+redis_hosts = ["redis://redis-host2.com:6379/1", "redis://redis-host3.com:6379/1"]
 
-Populator.populate_cluster(redis_hosts, 400, 100)
+mb = MigratorBenchmark.new(redis_hosts)
+
+mb.populate_cluster(1000, 100)
 
 
 
