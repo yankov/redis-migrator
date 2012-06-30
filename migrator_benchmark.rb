@@ -16,7 +16,7 @@ class MigratorBenchmark
   end
 
   def redis
-    @redis ||= Redis::Distributed.new(@redis_hosts) if EM.reactor_running?
+    @redis ||= Redis::Distributed.new(@redis_hosts, :em => true) if EM.reactor_running?
   end
 
   def measure_time(start_time, message='')
@@ -45,6 +45,8 @@ class MigratorBenchmark
     self.counter = 0
 
     EM.synchrony do
+      redis.flushdb
+
       measure_time(Time.now, "Populating of #{keys_num} keys with #{size} members took")
 
       EM::Synchrony::FiberIterator.new(keys_num.times.to_a, 2000).each do |i|
@@ -57,8 +59,20 @@ class MigratorBenchmark
 end
 
 
-redis_hosts = ["redis://redis-host2.com:6379/1", "redis://redis-host3.com:6379/1"]
+# redis_hosts = ["redis://redis-host1.com:6379/1", "redis://redis-host2.com:6379/1"]
 
-mb = MigratorBenchmark.new(redis_hosts)
+# redis_hosts = ["redis://localhost:6379/1", "redis://localhost:6378/1"]
+# mb = MigratorBenchmark.new(redis_hosts)
+# mb.populate_cluster(1000, 100)
 
-mb.populate_cluster(1000, 100)
+# migrator = Redis::Migrator.new(["redis-host1.com:6379", "redis-host2.com:6379"],
+#                                ["redis-host1.com:6379", "redis-host2.com:6379", "redis-host3.com:6379"])
+
+
+migrator = Redis::Migrator.new(["localhost:6379", "localhost:6378"],
+                               ["localhost:6379", "localhost:6378", "localhost:6377"])
+
+puts migrator.changed_keys
+
+migrator.migrate_cluster
+
