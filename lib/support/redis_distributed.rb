@@ -6,7 +6,8 @@ class Redis
       @default_options = options
       
       require "redis" unless options[:em]
-      
+      require "redis/connection/hiredis"
+
       redises = urls.map do |url| 
         host, port = url_to_hostport(url) 
         if options[:em]

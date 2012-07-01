@@ -103,10 +103,12 @@ class Redis
       size = keys.count
 
       EM.synchrony do
-        stop_when { counter == size }
 
         EM::Synchrony::FiberIterator.new(keys, 2000).each {|key|
-          copy_key(key).callback { counter += 1; }
+          copy_key(key).callback { 
+            counter += 1; 
+            EM.stop if counter == size
+          }
         }
 
       end

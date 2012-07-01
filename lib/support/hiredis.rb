@@ -9,3 +9,13 @@ module EventMachine::Hiredis
     end
   end
 end
+
+# class Redis
+#   module Connection
+#     class Hiredis
+#       def id
+#         "redis://#{@host}:#{@port}/#{@db}"
+#       end
+#     end
+#   end
+# end

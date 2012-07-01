@@ -3,6 +3,7 @@ require 'digest'
 require 'em-synchrony'
 require "em-synchrony/fiber_iterator"
 require 'em-hiredis'
+require 'hiredis'
 require 'redis/distributed'
 require './lib/support/hiredis.rb'
 require './lib/support/redis_distributed.rb'
@@ -16,7 +17,11 @@ class MigratorBenchmark
   end
 
   def redis
-    @redis ||= Redis::Distributed.new(@redis_hosts, :em => true) if EM.reactor_running?
+    if EM.reactor_running?
+      @em_redis ||= Redis::Distributed.new(@redis_hosts, :em => true)
+    else
+      @redis ||=  Redis::Distributed.new(@redis_hosts)
+    end
   end
 
   def measure_time(start_time, message='')
@@ -31,46 +36,77 @@ class MigratorBenchmark
 
   def populate_keys(i, num)
     key = ::Digest::MD5.hexdigest(i.to_s)
-
-    num.times do |x|
-      redis.sadd(key, ::Digest::MD5.hexdigest("f" + x.to_s)).callback { self.counter += 1 }
+    
+    commands = num.times.map do |x| 
+      ["sadd", key, ::Digest::MD5.hexdigest("f" + x.to_s)]
     end
-  rescue => e
-    p e.message
+    
+    redis.node_for(key).client.call_pipelined(commands)    
   end
 
 
   def populate_cluster(keys_num, size)
-    self.loop_size = keys_num * size
-    self.counter = 0
+    redis.flushdb
 
-    EM.synchrony do
-      redis.flushdb
 
-      measure_time(Time.now, "Populating of #{keys_num} keys with #{size} members took")
+    nodes = keys_num.times.to_a.inject({}) do |a, i|
+      # self.populate_keys(i, size)
+      key = ::Digest::MD5.hexdigest(i.to_s)
 
-      EM::Synchrony::FiberIterator.new(keys_num.times.to_a, 2000).each do |i|
-        self.populate_keys(i, size)
+      a[redis.node_for(key).id] = [] if a[redis.node_for(key).id].nil?
+      a[redis.node_for(key).id] << key
+      a
+    end
+
+    nodes.each do |node, keys|
+
+      commands = keys.inject([]) do |acc, key| 
+        size.times.to_a.each do |x|
+          acc << ["sadd", key, ::Digest::MD5.hexdigest("f" + x.to_s)]
+        end
+
+        acc
       end
 
+      p "populating #{node}"
+      r = redis.node_for(keys.first).client.call_pipelined(commands)
+
     end
+
   end
 
 end
 
-# redis_hosts = ["redis://redis-host1.com:6379/1", "redis://redis-host2.com:6379/1"]
+def without_gc
+  GC.start
+  GC.disable
+  yield
+ensure
+  GC.enable
+end
+
+
+# redis_hosts = ["redis://redis-host2.com:6379/1", "redis://redis-host3.com:6379/1"]
 
 redis_hosts = ["redis://localhost:6379/1", "redis://localhost:6378/1"]
 mb = MigratorBenchmark.new(redis_hosts)
-mb.populate_cluster(1000, 100)
+
+start_time = Time.now
+
+x = without_gc {
+ # mb.populate_cluster(10000, 100)
+}
+
+puts "Took #{Time.now - start_time} seconds"
+
 
 # migrator = Redis::Migrator.new(["redis-host1.com:6379", "redis-host2.com:6379"],
 #                                ["redis-host1.com:6379", "redis-host2.com:6379", "redis-host3.com:6379"])
 
 
-migrator = Redis::Migrator.new(["localhost:6379/1", "localhost:6378/1"],
-                               ["localhost:6379/1", "localhost:6378/1", "localhost:6377/1"])
+# migrator = Redis::Migrator.new(["localhost:6379/1", "localhost:6378/1"],
+#                                ["localhost:6379/1", "localhost:6378/1", "localhost:6377/1"])
 
 
-migrator.migrate_cluster
+# migrator.migrate_cluster
 
