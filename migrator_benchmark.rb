@@ -58,21 +58,19 @@ class MigratorBenchmark
 
 end
 
-
 # redis_hosts = ["redis://redis-host1.com:6379/1", "redis://redis-host2.com:6379/1"]
 
-# redis_hosts = ["redis://localhost:6379/1", "redis://localhost:6378/1"]
-# mb = MigratorBenchmark.new(redis_hosts)
-# mb.populate_cluster(1000, 100)
+redis_hosts = ["redis://localhost:6379/1", "redis://localhost:6378/1"]
+mb = MigratorBenchmark.new(redis_hosts)
+mb.populate_cluster(1000, 100)
 
 # migrator = Redis::Migrator.new(["redis-host1.com:6379", "redis-host2.com:6379"],
 #                                ["redis-host1.com:6379", "redis-host2.com:6379", "redis-host3.com:6379"])
 
 
-migrator = Redis::Migrator.new(["localhost:6379", "localhost:6378"],
-                               ["localhost:6379", "localhost:6378", "localhost:6377"])
+migrator = Redis::Migrator.new(["localhost:6379/1", "localhost:6378/1"],
+                               ["localhost:6379/1", "localhost:6378/1", "localhost:6377/1"])
 
-puts migrator.changed_keys
 
 migrator.migrate_cluster
 

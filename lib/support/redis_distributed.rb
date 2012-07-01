@@ -25,6 +25,5 @@ class Redis
       host, port = url.gsub(/redis:\/\//, '').split(/:/)
       [host, port.to_i]
     end
-
   end
 end

@@ -34,19 +34,23 @@ class Redis
       end
     
       def copy_set(r1, r2, key)
+        df = EM::DefaultDeferrable.new
+
         r1.smembers(key).callback do |members|
           size = members.count
           counter = 0
 
           members.each { |member| r2.sadd(key, member).callback { 
-            counter += 1
-            if counter == size
-              old_port = r1.node_for(key).port
-              r1.node_for(key).del(key)
-            end
+              counter += 1
+              if counter == size
+                r1.node_for(key).del(key)
+                df.set_deferred_status :succeeded, size
+              end
             } 
           }
         end
+
+        df
       end
     
       def copy_zset(r1, r2, key)
@@ -95,11 +99,16 @@ class Redis
 
     def migrate_keys(keys)
       return false if keys.empty? || keys.nil?
+      counter = 0
+      size = keys.count
 
       EM.synchrony do
+        stop_when { counter == size }
+
         EM::Synchrony::FiberIterator.new(keys, 2000).each {|key|
-          copy_key(old_cluster, new_cluster, key)
+          copy_key(key).callback { counter += 1; }
         }
+
       end
     end
 
@@ -109,12 +118,18 @@ class Redis
       migrate_keys(self.changed_keys)
     end
 
-    def copy_key(old_cluster, new_cluster, key)
+    def copy_key(key)
+      df = EM::DefaultDeferrable.new
+
       old_cluster.type(key).callback {|key_type|
         next unless ['list', 'hash', 'string', 'set', 'zset'].include?(key_type)
 
-        Migrator.send("copy_#{key_type}", old_cluster, new_cluster, key)
+        Migrator.send("copy_#{key_type}", old_cluster, new_cluster, key).callback {
+          df.set_deferred_status :succeeded, key
+        }
       }
+
+      df
     end
 
   end # class Migrator

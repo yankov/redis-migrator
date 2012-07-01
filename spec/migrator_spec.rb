@@ -15,7 +15,7 @@ describe Redis::Migrator do
   end
 
   it "should show keys which need migration" do
-    @migrator.changed_keys.sort.should == ["h", "j", "m", "n", "o", "q", "s", "y"]
+    @migrator.changed_keys.sort.should == ["d", "e", "l", "m", "r", "s", "u", "v", "w", "x", "y", "z"]
   end
 
   it "should migrate given keys to a new cluster" do
