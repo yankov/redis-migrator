@@ -45,6 +45,7 @@ class MigratorBenchmark
   end
 
 
+
   def populate_cluster(keys_num, size)
     redis.flushdb
 
@@ -63,13 +64,17 @@ class MigratorBenchmark
       commands = keys.inject([]) do |acc, key| 
         size.times.to_a.each do |x|
           acc << ["sadd", key, ::Digest::MD5.hexdigest("f" + x.to_s)]
+          if acc.count == 1000
+            redis.node_for(keys.first).client.call_pipelined(acc)
+            acc = []
+          end
         end
 
         acc
       end
 
       p "populating #{node}"
-      r = redis.node_for(keys.first).client.call_pipelined(commands)
+      redis.node_for(keys.first).client.call_pipelined(commands) unless commands.empty?
 
     end
 
@@ -94,7 +99,7 @@ mb = MigratorBenchmark.new(redis_hosts)
 start_time = Time.now
 
 x = without_gc {
- # mb.populate_cluster(10000, 100)
+ mb.populate_cluster(10000, 1000)
 }
 
 puts "Took #{Time.now - start_time} seconds"
