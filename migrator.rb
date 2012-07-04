@@ -1,137 +1,123 @@
-require 'em-synchrony'
-require "em-synchrony/fiber_iterator"
-require 'em-hiredis'
+require 'redis'
 require 'redis/distributed'
-require './lib/support/hiredis.rb'
-require './lib/support/redis_distributed.rb'
 require 'ruby-debug'
 
 class Redis
   class Migrator
 
+    attr_accessor :old_cluster, :new_cluster, :old_hosts, :new_hosts
+
     def initialize(old_hosts, new_hosts)
-      @old_hosts   = old_hosts.map{|h| "redis://" + h}
-      @new_hosts   = new_hosts.map{|h| "redis://" + h}
+      @old_hosts = old_hosts
+      @new_hosts = new_hosts
+      @old_cluster = Redis::Distributed.new(old_hosts)
+      @new_cluster = Redis::Distributed.new(new_hosts)
     end
 
     class << self
-      def copy_string(r1, r2, key)
-        value = r1.get(key).callback {|value|
-          r2.set(key, value)
+      def redis
+        Thread.current[:redis]
+      end
+
+      def to_redis_proto(*cmd)
+        cmd.inject("*#{cmd.length}\r\n") {|acc, arg|
+          acc << "$#{arg.length}\r\n#{arg}\r\n"
         }
       end
+
+      def copy_string(pipe, key)
+        value = redis.get(key)
+        pipe << to_redis_proto(*["SET", key, value])
+      end
     
-      def copy_hash(r1, r2, key)
-        r1.hgetall(key).each do |field, value|
-          r2.hset(key, field, value)
+      def copy_hash(pipe, key)
+        redis.hgetall(key).each do |field, value|
+          pipe << to_redis_proto(*["HSET", key, field, value]) 
         end
       end
     
-      def copy_list(r1, r2, key)
-        r1.lrange(key, 0, -1).each do |value|
-          r2.lpush(key, value)
+      def copy_list(pipe, key)
+        redis.lrange(key, 0, -1).each do |value|
+          pipe << to_redis_proto(*["LPUSH", key, value])
         end
       end
     
-      def copy_set(r1, r2, key)
-        df = EM::DefaultDeferrable.new
-
-        r1.smembers(key).callback do |members|
-          size = members.count
-          counter = 0
-
-          members.each { |member| r2.sadd(key, member).callback { 
-              counter += 1
-              if counter == size
-                r1.node_for(key).del(key)
-                df.set_deferred_status :succeeded, size
-              end
-            } 
-          }
+      def copy_set(pipe, key)
+        redis.smembers(key).each do |member|
+          pipe << to_redis_proto(*["SADD", key, member])
         end
-
-        df
       end
     
-      def copy_zset(r1, r2, key)
-        r1.zrange(key, 0, -1, :with_scores => true).each_slice(2) do |member, score|
-          r2.zadd(key, score, member)
+      def copy_zset(pipe, key)
+        redis.zrange(key, 0, -1, :with_scores => true).each_slice(2) do |member, score|
+          pipe << to_redis_proto(*["ZADD", key, score, member])
         end 
       end
     end # class << self
 
-    def old_cluster
-      if EM.reactor_running?
-        @em_old_cluster ||= Redis::Distributed.new(@old_hosts, :em => true)
-      else
-        @not_em_old_cluster ||=  Redis::Distributed.new(@old_hosts)
-      end
-    end
-
-    def new_cluster
-      if EM.reactor_running?
-        @em_new_cluster ||= Redis::Distributed.new(@new_hosts, :em => true)
-      else
-        @not_em_new_cluster ||=  Redis::Distributed.new(@new_hosts)
-      end
-    end
-
-    def stop_when(&blk)
-      EM::add_periodic_timer( 2 ) do 
-        next unless blk.call
-        EM.stop
-      end
-    end
 
     def changed_keys
-      keys = old_cluster.keys("*")
+      keys = @old_cluster.keys("*")
 
-      keys.inject([]) do |acc, key|
-        old_client = old_cluster.node_for(key).client
-        new_client = new_cluster.node_for(key).client
+      keys.inject({}) do |acc, key|
+        old_node = @old_cluster.node_for(key).client
+        new_node = @new_cluster.node_for(key).client
 
-        acc << key if "#{old_client.host}:#{old_client.port}" != "#{new_client.host}:#{new_client.port}"
-        
+        if (old_node.host != new_node.host) || (old_node.port != new_node.port)
+          hash_key = "redis://#{new_node.host}:#{new_node.port}/#{new_node.db}"
+          acc[hash_key] = [] if acc[hash_key].nil?
+          acc[hash_key] << key
+        end
+
         acc
       end
 
     end
 
-    def migrate_keys(keys)
+    def parse_redis_url(redis_url)
+      node = URI(redis_url)
+      path = node.path
+      db = path[1..-1].to_i rescue 0
+
+      {
+        :host => node.host,
+        :port => node.port,
+        :db   => db
+      }
+    end
+
+    def migrate_keys(node, keys)
       return false if keys.empty? || keys.nil?
-      counter = 0
-      size = keys.count
+      
+      Thread.current[:redis] = Redis::Distributed.new(old_hosts)
 
-      EM.synchrony do
+      f = IO.popen("redis-cli -h #{node[:host]} -p #{node[:port]} -n #{node[:db]} --pipe", IO::RDWR)
 
-        EM::Synchrony::FiberIterator.new(keys, 2000).each {|key|
-          copy_key(key).callback { 
-            counter += 1; 
-            EM.stop if counter == size
-          }
-        }
+      keys.each {|key|
+        copy_key(f, key)
+        old_cluster.node_for(key).del(key)
+      }
 
-      end
+      f.close
     end
 
     def migrate_cluster(options={})
-      puts "Migrating #{self.changed_keys.count} keys"
+      keys_to_migrate = changed_keys
+      p keys_to_migrate
+      puts "Migrating #{keys_to_migrate.values.flatten.count} keys"
+      
+      keys_to_migrate.keys.each do |node_url|
+        node = parse_redis_url(node_url)
+        migrate_keys(node, keys_to_migrate[node_url])
+      end
 
-      migrate_keys(self.changed_keys)
     end
 
-    def copy_key(key)
-      df = EM::DefaultDeferrable.new
+    def copy_key(f, key)
+      key_type = old_cluster.type(key)
+      return false unless ['list', 'hash', 'string', 'set', 'zset'].include?(key_type)
 
-      old_cluster.type(key).callback {|key_type|
-        next unless ['list', 'hash', 'string', 'set', 'zset'].include?(key_type)
-
-        Migrator.send("copy_#{key_type}", old_cluster, new_cluster, key).callback {
-          df.set_deferred_status :succeeded, key
-        }
-      }
-
-      df
+      Migrator.send("copy_#{key_type}", f, key)
     end
 
   end # class Migrator

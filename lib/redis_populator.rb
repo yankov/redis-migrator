@@ -1,3 +1,5 @@
+require 'digest'
+
 class Redis
   class Populator
 

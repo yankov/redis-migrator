@@ -5,17 +5,17 @@ describe Redis::Migrator do
       MockRedis.new(options) 
     }
   
-    @migrator = Redis::Migrator.new(["localhost:6379", "localhost:6378"],
-                                    ["localhost:6379", "localhost:6378", "localhost:6377"])
+    @migrator = Redis::Migrator.new(["redis://localhost:6379", "redis://localhost:6378"],
+                                    ["redis://localhost:6379", "redis://localhost:6378", "redis://localhost:6377"])
 
     #populate old cluster with some keys
     ('a'..'z').to_a.each do |key|
-      (1..100).to_a.each {|val| @migrator.old_cluster.sadd(key, val)}
+      (1..100).to_a.each {|val| @migrator.instance_variable_get("@old_cluster").sadd(key, val)}
     end
   end
 
   it "should show keys which need migration" do
-    @migrator.changed_keys.sort.should == ["d", "e", "l", "m", "r", "s", "u", "v", "w", "x", "y", "z"]
+    @migrator.changed_keys.should == {"redis://localhost:6377/0" => ["h", "q", "s", "y", "j", "m", "n", "o"]}
   end
 
   it "should migrate given keys to a new cluster" do
