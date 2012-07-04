@@ -1,30 +1,14 @@
 require 'digest'
+require_relative 'redis_helper'
 
 class Redis
   class Populator
+    include Redis::Helper
 
     attr_accessor :redis
 
     def initialize(redis_hosts)
       @redis = Redis::Distributed.new(redis_hosts)
-    end
-
-    def parse_redis_url(redis_url)
-      node = URI(redis_url)
-      path = node.path
-      db = path[1..-1].to_i rescue 0
-
-      {
-        :host => node.host,
-        :port => node.port,
-        :db   => db
-      }
-    end
-
-    def to_redis_proto(*cmd)
-      cmd.inject("*#{cmd.length}\r\n") {|acc, arg|
-        acc << "$#{arg.length}\r\n#{arg}\r\n"
-      }
     end
 
     # generate sets' keys to populate redis cluster
