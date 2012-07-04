@@ -86,7 +86,7 @@ class Redis
       }
     end
 
-    def migrate_keys(node, keys)
+    def migrate_keys(node, keys, options={})
       return false if keys.empty? || keys.nil?
       
       Thread.current[:redis] = Redis::Distributed.new(old_hosts)
@@ -95,7 +95,7 @@ class Redis
 
       keys.each {|key|
         copy_key(f, key)
-        old_cluster.node_for(key).del(key)
+        Redis.redis.node_for(key).del(key) unless options[:do_not_remove]
       }
 
       f.close
