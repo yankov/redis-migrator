@@ -16,6 +16,6 @@ migrator = Redis::Migrator.new(old_redis_hosts, new_redis_hosts)
 
 Benchmark.bm do |x|
   x.report("populate:") { r.populate_cluster(1000, 100) }
-  x.report("migrate:") { migrator.migrate_cluster }
+  x.report("migrate:")  { migrator.migrate_cluster }
 end
 

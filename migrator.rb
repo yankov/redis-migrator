@@ -91,26 +91,30 @@ class Redis
       
       Thread.current[:redis] = Redis::Distributed.new(old_hosts)
 
-      f = IO.popen("redis-cli -h #{node[:host]} -p #{node[:port]} -n #{node[:db]} --pipe", IO::RDWR)
+      pipe = IO.popen("redis-cli -h #{node[:host]} -p #{node[:port]} -n #{node[:db]} --pipe", IO::RDWR)
 
       keys.each {|key|
-        copy_key(f, key)
-        Redis.redis.node_for(key).del(key) unless options[:do_not_remove]
+        copy_key(pipe, key)
+        Migrator.redis.node_for(key).del(key) unless options[:do_not_remove]
       }
 
-      f.close
+      pipe.close
     end
 
     def migrate_cluster(options={})
       keys_to_migrate = changed_keys
-      p keys_to_migrate
       puts "Migrating #{keys_to_migrate.values.flatten.count} keys"
-      
+      threads = []
+
       keys_to_migrate.keys.each do |node_url|
         node = parse_redis_url(node_url)
-        migrate_keys(node, keys_to_migrate[node_url])
+        
+        threads << Thread.new(node, keys_to_migrate[node_url]) {|node, keys|
+          migrate_keys(node, keys, options)
+        }
       end
 
+      threads.each{|t| t.join}
     end
 
     def copy_key(f, key)
