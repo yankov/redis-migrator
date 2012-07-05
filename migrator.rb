@@ -1,6 +1,8 @@
+require 'rubygems'
 require 'redis'
 require 'redis/distributed'
 require_relative 'lib/redis_helper'
+require 'ruby-debug'
 
 class Redis
   class Migrator
@@ -34,7 +36,6 @@ class Redis
 
         acc
       end
-
     end
 
     def migrate_keys(node, keys, options={})
@@ -46,13 +47,15 @@ class Redis
 
       keys.each {|key|
         copy_key(pipe, key)
+
+        #remove key from old node
         redis.node_for(key).del(key) unless options[:do_not_remove]
       }
 
       pipe.close
     end
 
-    def migrate_cluster(options={})
+    def run(options={})
       keys_to_migrate = changed_keys
       puts "Migrating #{keys_to_migrate.values.flatten.count} keys"
       threads = []

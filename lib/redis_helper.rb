@@ -7,7 +7,6 @@ class Redis
       }
     end
 
-
     def parse_redis_url(redis_url)
       node = URI(redis_url)
       path = node.path

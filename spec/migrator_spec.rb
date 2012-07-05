@@ -10,78 +10,54 @@ describe Redis::Migrator do
 
     #populate old cluster with some keys
     ('a'..'z').to_a.each do |key|
-      (1..100).to_a.each {|val| @migrator.instance_variable_get("@old_cluster").sadd(key, val)}
+      (1..5).to_a.each {|val| @migrator.instance_variable_get("@old_cluster").sadd(key, val)}
     end
   end
 
-  it "should show keys which need migration" do
-    @migrator.changed_keys.should == {"redis://localhost:6377/0" => ["h", "q", "s", "y", "j", "m", "n", "o"]}
+  describe Redis::Migrator, "#changed_keys" do
+    it "should show keys which need migration" do
+      @migrator.changed_keys.should == {"redis://localhost:6377/0" => ["h", "q", "s", "y", "j", "m", "n", "o"]}
+    end
   end
 
-  it "should migrate given keys to a new cluster" do
-    keys = ["q", "s", "j"]
+  describe Redis::Migrator, "#migrate_keys" do
+    let(:keys) { ["q", "s", "j"] }
+    let(:node) { {:host => "localhost", :port => 6378, :db => 1} }
 
-    @migrator.migrate_keys(keys)
+    before do
+      Redis::Distributed.should_receive(:new).and_return(@migrator.old_cluster)
+      
+      @pipe = PipeMock.new(@migrator.new_cluster)
+      IO.should_receive(:popen).with("redis-cli -h localhost -p 6378 -n 1 --pipe", IO::RDWR).and_return(@pipe)
+    end
 
-    (@migrator.new_cluster.keys("*") & keys).sort.should == ["j", "q", "s"]
-    (@migrator.old_cluster.keys("*") & keys).sort.should == []
+    it "should copy given keys to a new cluster" do
+      @migrator.migrate_keys(node, keys)
+      (@migrator.new_cluster.keys("*") & keys).sort.should == ["j", "q", "s"]
+    end
+
+    it "should remove copied keys from the old redis node" do
+      @migrator.migrate_keys(node, keys)
+      (@migrator.old_cluster.keys("*") & keys).sort.should == []      
+    end
+
+    it "should keep keys on old node if asked" do
+      @migrator.migrate_keys(node, keys, :do_not_remove => true)
+      (@migrator.old_cluster.keys("*") & keys).sort.should == ["j", "q", "s"]      
+    end
   end
 
-  it "should migrate all keys for which nodes have changed" do
-    @migrator.migrate_cluster
+  describe Redis::Migrator, "#copy_key" do
 
-    (@migrator.old_cluster.keys("*") & @migrator.changed_keys).should == []
-    (@migrator.new_cluster.keys("*") & @migrator.changed_keys).should == @migrator.changed_keys
-  end
-  
-end
+    it "should return FALSE for unknown key" do
+      @migrator.copy_key(nil, "some_key").should == false
+    end
 
-describe "copying redis keys" do 
-  before do
-    @r1 = MockRedis.new
-    @r2 = MockRedis.new
-  end
+    it "should call copy_set if give key is set" do
+      @migrator.should_receive(:copy_set).with(nil, "a")
+      @migrator.copy_key(nil, "a")
+    end
 
-  it "should copy a string" do
-    @r1.set("a", "some_string")
-    Redis::Migrator.copy_string(@r1, @r2, "a")
-
-    @r2.get("a").should == "some_string"
-  end
-
-  it "should copy a hash" do
-    @r1.hmset("myhash", 
-      "first_name", "James",
-      "last_name", "Randi",
-      "age", "83")
-
-    Redis::Migrator.copy_hash(@r1, @r2, "myhash")
-
-    @r2.hgetall("myhash").should == {"first_name" => "James", "last_name" => "Randi", "age" => "83"}
-  end
-
-  it "should copy a list" do
-    ('a'..'z').to_a.each { |val| @r1.lpush("mylist", val) }
-
-    Redis::Migrator.copy_list(@r1, @r2, "mylist")
-
-    @r2.lrange("mylist", 0, -1).should == ('a'..'z').to_a
-  end
-
-  it "should copy a set" do
-    ('a'..'z').to_a.each { |val| @r1.sadd("myset", val) } 
-
-    Redis::Migrator.copy_set(@r1, @r2, "myset")
-
-    @r2.smembers("myset").should == ('a'..'z').to_a
-  end
-
-  it "should copy zset" do
-    ('a'..'z').to_a.each { |val| @r1.zadd("myzset", rand(100), val) } 
-
-    Redis::Migrator.copy_zset(@r1, @r2, "myzset")
-
-    @r2.zrange("myzset", 0, -1, :with_scores => true).should == @r1.zrange("myzset", 0, -1, :with_scores => true)
   end
 
 end
