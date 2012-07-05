@@ -9,14 +9,9 @@ require "mock_redis.rb"
 class PipeMock
   def initialize(redis)
     @redis = redis
-    @pipe = []
   end
 
   def close; true; end
-
-  def pipe
-    @pipe ||= []
-  end
 
   def <<(val)
     val[0] = val[0].downcase.to_sym

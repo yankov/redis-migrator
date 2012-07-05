@@ -10,7 +10,7 @@ describe Redis::Migrator do
 
     #populate old cluster with some keys
     ('a'..'z').to_a.each do |key|
-      (1..5).to_a.each {|val| @migrator.instance_variable_get("@old_cluster").sadd(key, val)}
+      (1..5).to_a.each {|val| @migrator.old_cluster.sadd(key, val)}
     end
   end
 
@@ -53,7 +53,7 @@ describe Redis::Migrator do
       @migrator.copy_key(nil, "some_key").should == false
     end
 
-    it "should call copy_set if give key is set" do
+    it "should call copy_set if given key is set" do
       @migrator.should_receive(:copy_set).with(nil, "a")
       @migrator.copy_key(nil, "a")
     end
