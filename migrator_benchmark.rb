@@ -1,8 +1,7 @@
-require './migrator.rb'
-require 'rubygems'
+require 'redis_migrator'
 require 'uri'
 require 'benchmark'
-require_relative 'lib/redis_populator'
+require 'redis_migrator/redis_populator'
 
 # a list of hosts for an old cluster
 # You either have to start 3 Redis instances on your local - each on its

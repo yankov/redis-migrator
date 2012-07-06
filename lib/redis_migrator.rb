@@ -1,7 +1,7 @@
 require 'rubygems'
 require 'redis'
 require 'redis/distributed'
-require_relative 'support/redis_helper'
+require_relative 'redis_migrator/redis_helper'
 
 class Redis
   class Migrator
