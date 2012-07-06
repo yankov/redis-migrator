@@ -13,10 +13,10 @@ Redis-migrator takes a list of nodes for your old cluster and list of nodes for 
 and determines for which keys routes were changed. Then it moves those keys to new nodes.
 
 ##Install  
-`gem install redis-migrator`
+`gem install redis_migrator`
 
 ##Usage  
-    require 'redis-migrator'
+    require 'redis_migrator'
 
     # a list of redis-urls for an old cluster
     old_redis_hosts = ["redis://host1.com:6379", "redis://host2.com:6379"]

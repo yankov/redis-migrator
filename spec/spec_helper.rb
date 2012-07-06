@@ -1,6 +1,6 @@
 $LOAD_PATH.unshift File.expand_path(File.join(File.dirname(__FILE__), "mock_redis/lib"))
 
-require_relative "../migrator.rb"
+require_relative "../lib/redis_migrator.rb"
 
 # include patched version of mock_redis
 # that works with Redis::Distributed
