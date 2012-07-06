@@ -19,4 +19,3 @@ Benchmark.bm do |x|
   x.report("populate:") { r.populate_cluster(1000, 100) }
   x.report("migrate:")  { migrator.run }
 end
-
