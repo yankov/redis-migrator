@@ -20,6 +20,11 @@ class Redis
       Thread.current[:redis]
     end
 
+    # Finds redis keys for which migration is needed
+    # @return a hash of keys grouped by node they need to be written to
+    # @example Returned value
+    #   { "redis://host1.com" => ['key1', 'key2', 'key3'],
+    #     "redis://host2.com => ['key4', 'key5', 'key6']" }
     def changed_keys
       keys = @old_cluster.keys("*")
 
@@ -37,6 +42,10 @@ class Redis
       end
     end
 
+    # Migrates a given array of keys to a given redis node
+    # @param node [Hash] options for redis node keys will be migrated to
+    # @param keys [Array] array of keys that need to be migrated
+    # @param options [Hash] additional options, such as :do_not_remove => true
     def migrate_keys(node, keys, options={})
       return false if keys.empty? || keys.nil?
       
@@ -54,6 +63,8 @@ class Redis
       pipe.close
     end
 
+    # Runs a migration process for a Redis cluster. 
+    # @param [Hash] additional options such as :do_not_remove => true
     def run(options={})
       keys_to_migrate = changed_keys
       puts "Migrating #{keys_to_migrate.values.flatten.count} keys"
@@ -62,6 +73,7 @@ class Redis
       keys_to_migrate.keys.each do |node_url|
         node = parse_redis_url(node_url)
         
+        #spawn a separate thread for each Redis pipe
         threads << Thread.new(node, keys_to_migrate[node_url]) {|node, keys|
           migrate_keys(node, keys, options)
         }
@@ -70,6 +82,9 @@ class Redis
       threads.each{|t| t.join}
     end
 
+    # Copy a given Redis key to a Redis pipe
+    # @param pipe [IO] a pipe opened  redis-cli --pipe 
+    # @param key [String] a Redis key that needs to be copied
     def copy_key(pipe, key)
       key_type = old_cluster.type(key)
       return false unless ['list', 'hash', 'string', 'set', 'zset'].include?(key_type)

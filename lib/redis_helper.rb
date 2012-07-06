@@ -14,7 +14,7 @@ class Redis
 
       {
         :host => node.host,
-        :port => node.port,
+        :port => node.port || 6379,
         :db   => db
       }
     end

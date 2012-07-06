@@ -11,7 +11,7 @@ class Redis
       @redis = Redis::Distributed.new(redis_hosts)
     end
 
-    # generate sets' keys to populate redis cluster
+    # Generate sets' keys to populate redis cluster
     # @param num size [Integer] the number of sets that have to be created
     # @return hash of keys grouped by redis node
     def generate_keys(num)
@@ -25,7 +25,7 @@ class Redis
       end
     end
 
-    # populates sets with the given amount of members
+    # Populates sets with the given amount of members
     # @param node [Hash] a parsed redis_url 
     # @param keys [Array] an array of sets' keys that need to be populated 
     def populate_keys(node, keys, size)
@@ -33,14 +33,14 @@ class Redis
 
       keys.each do |key|
         size.times.map do |x| 
-          f << to_redis_proto(*["SADD", key, ::Digest::MD5.hexdigest("f" + x.to_s)])
+          f << to_redis_proto("SADD", key, ::Digest::MD5.hexdigest("f" + x.to_s))
         end
       end
 
       f.close
     end
 
-    # populates redis cluster 
+    # Populates redis cluster 
     # @param keys_num [Integer] amount of redis sets that need to be populated
     # @param num [Integer] number of members in each set
     def populate_cluster(keys_num, num)
