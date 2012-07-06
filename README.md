@@ -22,7 +22,7 @@ and determines for which keys routes were changed. Then it moves those keys to n
     old_redis_hosts = ["redis://host1.com:6379", "redis://host2.com:6379"]
 
     # a list of redis-urls for a new cluster
-    old_redis_hosts = ["redis://host1.com:6379", "redis://host2.com:6379", "redis://host3.com:6379"]
+    new_redis_hosts = ["redis://host1.com:6379", "redis://host2.com:6379", "redis://host3.com:6379"]
 
     migrator = Redis::Migrator.new(old_redis_hosts, new_redis_hosts)
     migrator.run
