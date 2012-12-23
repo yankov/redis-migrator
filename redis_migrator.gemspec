@@ -3,7 +3,7 @@ $:.push File.expand_path("./lib", __FILE__)
 
 Gem::Specification.new do |s|
   s.name        = "redis_migrator"
-  s.version     = "0.0.1"
+  s.version     = "0.0.2"
   s.date        = "2012-07-05"
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Artem Yankov"]
@@ -16,5 +16,5 @@ Gem::Specification.new do |s|
   s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
   s.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
   s.require_paths = ["lib"]
-  s.add_dependency('redis', '>= 2.2.2')
+  s.add_dependency('redis', '>= 3.0.0')
 end

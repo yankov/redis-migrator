@@ -136,7 +136,7 @@ class MockRedis
         else
           member
         end
-      end.flatten
+      end
     end
 
     def combine_weighted_zsets(keys, options, how)
