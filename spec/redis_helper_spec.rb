@@ -1,7 +1,7 @@
-describe Redis::Helper do 
+describe Redis::Helper do
   before do
-    Redis.should_receive(:new).any_number_of_times {|options|  
-      MockRedis.new(options) 
+    Redis.should_receive(:new).any_number_of_times {|options|
+      MockRedis.new(options)
     }
 
     @migrator = Redis::Migrator.new(["redis://localhost:6379"],
@@ -21,7 +21,7 @@ describe Redis::Helper do
   end
 
   it "should copy a hash" do
-    @r1.hmset("myhash", 
+    @r1.hmset("myhash",
       "first_name", "James",
       "last_name", "Randi",
       "age", "83")
@@ -40,7 +40,7 @@ describe Redis::Helper do
   end
 
   it "should copy a set" do
-    ('a'..'z').to_a.each { |val| @r1.sadd("myset", val) } 
+    ('a'..'z').to_a.each { |val| @r1.sadd("myset", val) }
 
     @migrator.copy_set(@pipe, "myset")
 
@@ -48,7 +48,7 @@ describe Redis::Helper do
   end
 
   it "should copy zset" do
-    ('a'..'z').to_a.each { |val| @r1.zadd("myzset", rand(100), val) } 
+    ('a'..'z').to_a.each { |val| @r1.zadd("myzset", rand(100), val) }
 
     @migrator.copy_zset(@pipe, "myzset")
 
