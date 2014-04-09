@@ -31,5 +31,17 @@ and determines for which keys routes were changed. Then it moves those keys to n
 * ruby 1.9 or jruby (with --1.9 flag)
 * redis >=2.4.14 (only on machine where migrator will be running)
 
+##Contributing
+
+    # First fork the project.
+    # Then bundle
+    bundle
+
+    # and make sure tests pass
+    bundle exec rspec spec
+
+    # Add features and profit.
+    # Send a pull request back to the original repository.
+
 ##TODO
 * Error handling 
