@@ -1,15 +1,15 @@
 describe Redis::Helper do
   before do
-    Redis.should_receive(:new).any_number_of_times {|options|
+    expect(Redis).to receive(:new).at_least(1).times do |options|
       MockRedis.new(options)
-    }
+    end
 
     @migrator = Redis::Migrator.new(["redis://localhost:6379"],
                                     ["redis://localhost:6377"])
 
     @r1 = @migrator.old_cluster
     @r2 = @migrator.new_cluster
-    @migrator.stub!(:redis).and_return(@r1)
+    allow(@migrator).to receive(:redis).and_return(@r1)
     @pipe = PipeMock.new(@r2)
   end
 

@@ -1,9 +1,9 @@
 describe Redis::Migrator do
   
   before do
-    Redis.should_receive(:new).any_number_of_times {|options|  
+    expect(Redis).to receive(:new).at_least(1).times do |options|
       MockRedis.new(options) 
-    }
+    end
   
     @migrator = Redis::Migrator.new(["redis://localhost:6379", "redis://localhost:6378"],
                                     ["redis://localhost:6379", "redis://localhost:6378", "redis://localhost:6377"])
