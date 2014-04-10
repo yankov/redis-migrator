@@ -1,8 +1,8 @@
-shared_examples 'different redis type migrator' do |node_hash = {}, options = {}|
+shared_examples 'different redis type migrator' do
   context 'key of type' do
     let(:keys) { [key] }
 
-    subject { migrator.migrate(node_hash, keys, options) }
+    subject { migrator.migrate(node, keys, {}) }
 
     context 'string' do
       let(:key) { 'a' }
@@ -10,7 +10,7 @@ shared_examples 'different redis type migrator' do |node_hash = {}, options = {}
       it 'should copy' do
         old_cluster.set(key, 'some_string')
         subject
-        new_cluster.get(key).should == 'some_string'
+        destination_cluster.get(key).should == 'some_string'
       end
     end
 
@@ -24,9 +24,9 @@ shared_examples 'different redis type migrator' do |node_hash = {}, options = {}
                           'last_name', 'Randi',
                           'age', '83')
         subject
-        new_cluster.hgetall(key).should == {'first_name' => 'James',
-                                            'last_name' => 'Randi',
-                                            'age' => '83'}
+        destination_cluster.hgetall(key).should == {'first_name' => 'James',
+                                                    'last_name' => 'Randi',
+                                                    'age' => '83'}
       end
     end
 
@@ -35,8 +35,9 @@ shared_examples 'different redis type migrator' do |node_hash = {}, options = {}
 
       it 'should copy' do
         ('a'..'z').to_a.each { |val| old_cluster.lpush(key, val) }
+        values = old_cluster.lrange(key, 0, -1)
         subject
-        new_cluster.lrange(key, 0, -1).should == ('a'..'z').to_a
+        destination_cluster.lrange(key, 0, -1).should == values
       end
     end
 
@@ -44,8 +45,9 @@ shared_examples 'different redis type migrator' do |node_hash = {}, options = {}
       let(:key) { 'myset' }
       it 'should copy' do
         ('a'..'z').to_a.each { |val| old_cluster.sadd(key, val) }
+        values = old_cluster.smembers(key)
         subject
-        new_cluster.smembers(key).should == ('a'..'z').to_a
+        destination_cluster.smembers(key).should == values
       end
     end
 
@@ -57,7 +59,7 @@ shared_examples 'different redis type migrator' do |node_hash = {}, options = {}
 
         subject
 
-        new_range = new_cluster.zrange(key, 0, -1, with_scores: true).sort
+        new_range = destination_cluster.zrange(key, 0, -1, with_scores: true).sort
         new_range.should == old_range
       end
     end

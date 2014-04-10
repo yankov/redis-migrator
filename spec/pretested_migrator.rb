@@ -1,4 +1,4 @@
-shared_examples 'pretested migrator' do
+shared_context 'common keys' do
   let(:keys) { %w(q s j) }
   let(:node) { { host: 'localhost', port: 6378, db: 1 } }
   let(:options) { {} }
@@ -13,13 +13,21 @@ shared_examples 'pretested migrator' do
   end
 
   subject { common_keys(cluster) }
+end
+
+shared_examples 'pretested migrator' do
+  include_context 'common keys'
 
   context do
-    let(:cluster) { new_cluster }
+    let(:cluster) { destination_cluster }
     it 'should copy given keys to a new cluster' do
       should == %w(j q s)
     end
   end
+end
+
+shared_examples 'safe pretested migrator' do
+  include_context 'common keys'
 
   context do
     let(:cluster) { old_cluster }
@@ -36,3 +44,4 @@ shared_examples 'pretested migrator' do
     end
   end
 end
+

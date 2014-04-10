@@ -2,6 +2,7 @@ require 'redis'
 require 'redis/distributed'
 require_relative 'redis_migrator/redis_helper'
 require_relative 'redis_migrator/redis_pipe_migrator'
+require_relative 'redis_migrator/redis_native_migrator'
 
 class Redis
   class Migrator

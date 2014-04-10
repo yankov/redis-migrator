@@ -7,13 +7,14 @@ describe Redis::PipeMigrator do
   include_context 'shared hosts context'
 
   let(:old_cluster) { Redis::Distributed.new(old_hosts) }
-  let(:new_cluster) { Redis::Distributed.new(new_hosts) }
-  let(:pipe) { PipeMock.new(new_cluster) }
+  let(:destination_cluster) { Redis::Distributed.new(new_hosts) }
+  let(:pipe) { PipeMock.new(destination_cluster) }
 
   before { allow(migrator).to receive(:redis).and_return(old_cluster) }
 
   describe '#migrate' do
     context do
+      let(:node) { {} }
       before { expect(IO).to receive(:popen).and_return(pipe) }
       it_behaves_like 'different redis type migrator'
     end
@@ -25,6 +26,7 @@ describe Redis::PipeMigrator do
       end
 
       it_behaves_like 'pretested migrator'
+      it_behaves_like 'safe pretested migrator'
     end
   end
 

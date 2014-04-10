@@ -10,8 +10,9 @@ class Redis
       Thread.current[:redis]
     end
 
-    def migrate(node, keys, options)
-      pipe = IO.popen("redis-cli -h #{node[:host]} -p #{node[:port]} -n #{node[:db]} --pipe", IO::RDWR)
+    def migrate(node_options, keys, options)
+      host, port, db = node_options[:host], node_options[:port], node_options[:db]
+      pipe = IO.popen("redis-cli -h #{host} -p #{port} -n #{db} --pipe", IO::RDWR)
 
       keys.each {|key|
         copy_key(pipe, key)
@@ -46,12 +47,12 @@ class Redis
 
     def copy_list(pipe, key)
       redis.lrange(key, 0, -1).each do |value|
-        pipe << to_redis_proto('LPUSH', key, value)
+        pipe << to_redis_proto('RPUSH', key, value)
       end
     end
 
     def copy_set(pipe, key)
-      redis.smembers(key).each do |member|
+      redis.smembers(key).reverse.each do |member|
         pipe << to_redis_proto('SADD', key, member)
       end
     end
