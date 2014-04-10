@@ -50,7 +50,7 @@ class Redis
     def migrate_keys(node, keys, options={})
       return false if keys.empty? || keys.nil?
 
-      Redis::PipeMigrator.new(old_hosts).migrate(node, keys, options)
+      migrator(options[:do_not_remove]).new(old_hosts).migrate(node, keys, options)
     end
 
     # Runs a migration process for a Redis cluster. 
@@ -70,6 +70,26 @@ class Redis
       end
 
       threads.each{|t| t.join}
+    end
+
+    private
+
+    def nodes
+      old_cluster.nodes + new_cluster.nodes
+    end
+
+    def old_nodes
+      @old_nodes ||= nodes.select { |node| node.info['redis_version'].to_f < 2.6 }
+    end
+
+    def migrator(keep_original)
+      @migrator ||= begin
+        if old_nodes.any? || keep_original
+          Redis::PipeMigrator
+        else
+          Redis::NativeMigrator
+        end
+      end
     end
   end # class Migrator
 end # class Redis
