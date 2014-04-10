@@ -33,7 +33,7 @@ class Redis
 
       keys.each do |key|
         size.times.map do |x| 
-          f << to_redis_proto("SADD", key, ::Digest::MD5.hexdigest("f" + x.to_s))
+          f << to_redis_proto('SADD', key, ::Digest::MD5.hexdigest('f' + x.to_s))
         end
       end
 
