@@ -1,7 +1,7 @@
-require 'rubygems'
 require 'redis'
 require 'redis/distributed'
 require_relative 'redis_migrator/redis_helper'
+require_relative 'redis_migrator/redis_pipe_migrator'
 
 class Redis
   class Migrator
@@ -48,19 +48,8 @@ class Redis
     # @param options [Hash] additional options, such as :do_not_remove => true
     def migrate_keys(node, keys, options={})
       return false if keys.empty? || keys.nil?
-      
-      Thread.current[:redis] = Redis::Distributed.new(old_hosts)
 
-      pipe = IO.popen("redis-cli -h #{node[:host]} -p #{node[:port]} -n #{node[:db]} --pipe", IO::RDWR)
-
-      keys.each {|key|
-        copy_key(pipe, key)
-
-        #remove key from old node
-        redis.node_for(key).del(key) unless options[:do_not_remove]
-      }
-
-      pipe.close
+      Redis::PipeMigrator.new(old_hosts).migrate(node, keys, options)
     end
 
     # Runs a migration process for a Redis cluster. 
@@ -81,16 +70,5 @@ class Redis
 
       threads.each{|t| t.join}
     end
-
-    # Copy a given Redis key to a Redis pipe
-    # @param pipe [IO] a pipe opened  redis-cli --pipe 
-    # @param key [String] a Redis key that needs to be copied
-    def copy_key(pipe, key)
-      key_type = old_cluster.type(key)
-      return false unless ['list', 'hash', 'string', 'set', 'zset'].include?(key_type)
-
-      self.send("copy_#{key_type}", pipe, key)
-    end
-
   end # class Migrator
 end # class Redis

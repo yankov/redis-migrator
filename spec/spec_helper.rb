@@ -23,3 +23,9 @@ class Redis
     end
   end
 end
+
+def prefill_cluster(cluster)
+  ('a'..'z').to_a.each do |key|
+    (1..5).to_a.each {|val| cluster.sadd(key, val)}
+  end
+end
