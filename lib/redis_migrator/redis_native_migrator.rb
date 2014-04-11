@@ -25,10 +25,18 @@ class Redis
         node_keys.each_slice(1000) do |slice|
           old_node.pipelined do
             slice.each do |key|
-              old_node.migrate(key, destination_node_options)
+              migrate_key(old_node, key, destination_node_options)
             end
           end
         end
+      end
+    end
+
+    def migrate_key(node, key, options)
+      if Redis::VERSION > '3.0.4'
+        node.migrate(key, options)
+      else
+        node.migrate([options[:host], options[:port], key, options[:db], options[:timeout]])
       end
     end
   end
