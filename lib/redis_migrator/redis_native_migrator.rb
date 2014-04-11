@@ -18,8 +18,16 @@ class Redis
       end
 
       grouped_by_old_nodes.each do |old_node, node_keys|
-        old_node.pipelined do
-          node_keys.each { |key| old_node.migrate(key, new_node_options) }
+        destination_node_options = new_node_options.merge(
+          timeout: 30 # lets add a generous timeout here
+        )
+
+        node_keys.each_slice(1000) do |slice|
+          old_node.pipelined do
+            slice.each do |key|
+              old_node.migrate(key, destination_node_options)
+            end
+          end
         end
       end
     end
