@@ -4,7 +4,7 @@ $:.push File.expand_path("./lib", __FILE__)
 Gem::Specification.new do |s|
   s.name        = "redis_migrator"
   s.version     = "0.1.0"
-  s.date        = "2012-07-05"
+  s.date        = "2014-04-10"
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Artem Yankov"]
   s.email       = ["artem.yankov@gmail.com"]
