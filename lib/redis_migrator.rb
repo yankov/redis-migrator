@@ -27,9 +27,7 @@ class Redis
     #   { "redis://host1.com" => ['key1', 'key2', 'key3'],
     #     "redis://host2.com => ['key4', 'key5', 'key6']" }
     def changed_keys
-      keys = @old_cluster.keys("*")
-
-      keys.inject({}) do |acc, key|
+      old_cluster_keys.inject({}) do |acc, key|
         old_node = @old_cluster.node_for(key).client
         new_node = @new_cluster.node_for(key).client
 
@@ -41,6 +39,16 @@ class Redis
 
         acc
       end
+    end
+
+    # Returns all the keys that need to be redistributed. Can be overidden to
+    # return only a subset of old keys if migrating from a single redis environment
+    # to a mixed environment with both regular and distributed redis instances
+    # @return an array of keys that should be checked for redistributing
+    # @example Returned value
+    #   ['key1', 'key2', 'key3']
+    def old_cluster_keys
+      @old_cluster_keys ||= @old_cluster.keys("*")
     end
 
     # Migrates a given array of keys to a given redis node
