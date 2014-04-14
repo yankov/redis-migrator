@@ -26,21 +26,55 @@ class Redis
     # @example Returned value
     #   { "redis://host1.com" => ['key1', 'key2', 'key3'],
     #     "redis://host2.com => ['key4', 'key5', 'key6']" }
-    def changed_keys
-      keys = @old_cluster.keys("*")
+    def scan_keys
+      read_to_end_count = 0
+      cluster_cursors = @old_cluster.nodes.map { 0 }
 
-      keys.inject({}) do |acc, key|
-        old_node = @old_cluster.node_for(key).client
-        new_node = @new_cluster.node_for(key).client
+      loop do
+        threads = []
+        acc = {}
+        total_size = 0
 
-        if (old_node.host != new_node.host) || (old_node.port != new_node.port)
-          hash_key = "redis://#{new_node.host}:#{new_node.port}/#{new_node.db}"
-          acc[hash_key] = [] if acc[hash_key].nil?
-          acc[hash_key] << key
-        end
+        @old_cluster.nodes.each_with_index do |cluster, idx|
+          threads << Thread.new do
+            cursor = cluster_cursors[idx]
 
-        acc
-      end
+            return if cursor == -1
+
+            result = cluster.scan(cursor, count: 10000)
+            print "Old cluster #{cluster.client.host}:#{cluster.client.port} "
+            if result[0] != "0"
+              cluster_cursors[idx] = result[0].to_i
+              puts "cursor: #{cluster_cursors[idx]}"
+            else
+              cluster_cursors[idx] = -1
+              puts "readed to end."
+              read_to_end_count += 1
+            end
+            keys = result[1]
+
+            total_size += keys.count
+
+            keys.each do |key|
+              old_node = cluster.client
+              new_node = @new_cluster.node_for(key).client
+
+              if (old_node.host != new_node.host) || (old_node.port != new_node.port)
+                hash_key = "redis://#{new_node.host}:#{new_node.port}/#{new_node.db}"
+                acc[hash_key] = [] if acc[hash_key].nil?
+                acc[hash_key] << key
+              end
+            end
+          end
+        end # @old_cluster.nodes.each
+
+        threads.each { |t| t.join }
+
+        yield acc, total_size
+
+        # server return cursor 0, it's end.
+        break if read_to_end_count == @old_cluster.nodes.count
+      end # loop
     end
 
     # Migrates a given array of keys to a given redis node
@@ -53,23 +87,24 @@ class Redis
       migrator(options[:do_not_remove]).new(old_hosts).migrate(node, keys, options)
     end
 
-    # Runs a migration process for a Redis cluster. 
+    # Runs a migration process for a Redis cluster.
     # @param [Hash] additional options such as :do_not_remove => true
     def run(options={})
-      keys_to_migrate = changed_keys
-      puts "Migrating #{keys_to_migrate.values.flatten.count} keys"
-      threads = []
+      scan_keys do |keys_to_migrate, size|
+        puts "Migrating #{size} keys"
+        threads = []
 
-      keys_to_migrate.keys.each do |node_url|
-        node = parse_redis_url(node_url)
-        
-        #spawn a separate thread for each Redis pipe
-        threads << Thread.new(node, keys_to_migrate[node_url]) {|node, keys|
-          migrate_keys(node, keys, options)
-        }
+        keys_to_migrate.keys.each do |node_url|
+          node = parse_redis_url(node_url)
+
+          #spawn a separate thread for each Redis pipe
+          threads << Thread.new(node, keys_to_migrate[node_url]) {|node, keys|
+            migrate_keys(node, keys, options)
+          }
+        end
+
+        threads.each{|t| t.join}
       end
-
-      threads.each{|t| t.join}
     end
 
     private

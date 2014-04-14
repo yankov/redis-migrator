@@ -8,7 +8,13 @@ describe Redis::Migrator do
     before { prefill_cluster(migrator.old_cluster) }
 
     it 'should show keys which need migration' do
-      migrator.changed_keys.should == {'redis://localhost:6377/0' => %w(h q s y j m n o)}
+      allow_any_instance_of(MockRedis).to(
+        receive(:scan).and_return(["0",%W(h q s y j m n o)])
+      )
+      migrator.scan_keys do |result, size|
+        result.should == {'redis://localhost:6377/0' => %w(h q s y j m n o h q s y j m n o)}
+        size.should == 16
+      end
     end
   end
 
