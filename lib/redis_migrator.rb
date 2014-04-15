@@ -28,43 +28,47 @@ class Redis
     #     "redis://host2.com => ['key4', 'key5', 'key6']" }
     def scan_keys
       read_to_end_count = 0
-      cluster_cursors = @old_cluster.nodes.map { 0 }
+      node_cursors = @old_cluster.nodes.map { 0 }
 
       loop do
         threads = []
         acc = {}
         total_size = 0
 
-        @old_cluster.nodes.each_with_index do |cluster, idx|
+        @old_cluster.nodes.each_with_index do |node, idx|
           threads << Thread.new do
-            cursor = cluster_cursors[idx]
+            cursor = node_cursors[idx]
 
             return if cursor == -1
 
-            result = cluster.scan(cursor, count: 10000)
-            print "Old cluster #{cluster.client.host}:#{cluster.client.port} "
-            if result[0] != "0"
-              cluster_cursors[idx] = result[0].to_i
-              puts "cursor: #{cluster_cursors[idx]}"
+            if node.info['redis_version'].to_f < 2.8
+              result = ["0", node.keys("*")]
             else
-              cluster_cursors[idx] = -1
-              puts "readed to end."
-              read_to_end_count += 1
+              result = node.scan(cursor, count: 10000)
             end
-            keys = result[1]
 
+            keys = result[1]
             total_size += keys.count
 
             keys.each do |key|
-              old_node = cluster.client
               new_node = @new_cluster.node_for(key).client
 
-              if (old_node.host != new_node.host) || (old_node.port != new_node.port)
+              if (node.client.host != new_node.host) || (node.client.port != new_node.port)
                 hash_key = "redis://#{new_node.host}:#{new_node.port}/#{new_node.db}"
                 acc[hash_key] = [] if acc[hash_key].nil?
                 acc[hash_key] << key
               end
             end
+
+            if result[0] != "0"
+              node_cursors[idx] = result[0].to_i
+              puts "#{node.client.id} cursor: #{node_cursors[idx]}"
+            else
+              node_cursors[idx] = -1
+              read_to_end_count += 1
+              puts "#{node.client.id} readed to end."
+            end
+
           end
         end # @old_cluster.nodes.each
 
