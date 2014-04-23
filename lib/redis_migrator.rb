@@ -25,7 +25,7 @@ class Redis
     # @return a hash of keys grouped by node they need to be written to
     # @example Returned value
     #   { "redis://host1.com" => ['key1', 'key2', 'key3'],
-    #     "redis://host2.com => ['key4', 'key5', 'key6']" }
+    #     "redis://host2.com => ['key4', 'key5', 'key6']" }, 6
     def scan_keys
       read_to_end_count = 0
       node_cursors = @old_cluster.nodes.map { 0 }
@@ -35,40 +35,26 @@ class Redis
         acc = {}
         total_size = 0
 
+        # loop all nodes to fetch keys with threads
         @old_cluster.nodes.each_with_index do |node, idx|
           threads << Thread.new do
             cursor = node_cursors[idx]
 
             return if cursor == -1
 
-            if node.info['redis_version'].to_f < 2.8
-              result = ["0", node.keys("*")]
-            else
-              result = node.scan(cursor, count: 10000)
-            end
+            result = fetch_keys_from_redis(node, cursor)
 
             keys = result[1]
             total_size += keys.count
 
-            keys.each do |key|
-              new_node = @new_cluster.node_for(key).client
-
-              if (node.client.host != new_node.host) || (node.client.port != new_node.port)
-                hash_key = "redis://#{new_node.host}:#{new_node.port}/#{new_node.db}"
-                acc[hash_key] = [] if acc[hash_key].nil?
-                acc[hash_key] << key
-              end
-            end
+            distribute_keys(acc, node, keys)
 
             if result[0] != "0"
               node_cursors[idx] = result[0].to_i
-              puts "#{node.client.id} cursor: #{node_cursors[idx]}"
             else
               node_cursors[idx] = -1
               read_to_end_count += 1
-              puts "#{node.client.id} readed to end."
             end
-
           end
         end # @old_cluster.nodes.each
 
@@ -79,6 +65,28 @@ class Redis
         # server return cursor 0, it's end.
         break if read_to_end_count == @old_cluster.nodes.count
       end # loop
+    end
+    
+    def distribute_keys(acc, current_node, keys)
+      keys.each do |key|
+        new_node = @new_cluster.node_for(key).client
+
+        if (current_node.client.host != new_node.host) || (current_node.client.port != new_node.port)
+          hash_key = "redis://#{new_node.host}:#{new_node.port}/#{new_node.db}"
+          acc[hash_key] = [] if acc[hash_key].nil?
+          acc[hash_key] << key
+        end
+      end
+    end
+
+    # Read keys from Redis
+    # This method will use KEYS command to fetch all of the keys if Redis version is lower than 2.8
+    def fetch_keys_from_redis(node, cursor = 0)
+      if node.info['redis_version'].to_f < 2.8
+        ["0", node.keys("*")]
+      else
+        node.scan(cursor, count: 10000)
+      end
     end
 
     # Migrates a given array of keys to a given redis node
